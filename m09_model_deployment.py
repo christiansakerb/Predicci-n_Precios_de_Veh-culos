@@ -100,9 +100,9 @@ def Api_para_Predecir(Diccionario):
     
     Prediccion_api = pd.concat(Predicciones.values()).sort_values('ID').set_index('ID')
 
-    return Prediccion_api
-
-
+    return Prediccion_api[0][0]
+#http://44.202.217.55:5000/predict/?marca=Toyota&modelo=Camry&millas=50000&estado_uso=used&ano=2015
+#44.202.217.55
 if __name__ == "__main__":
     
     if len(sys.argv) == 1:
