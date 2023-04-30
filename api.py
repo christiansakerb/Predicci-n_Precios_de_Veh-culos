@@ -43,6 +43,6 @@ class PhishingApi(Resource):
         }, 200
     
 #http://3.136.27.89:5000/predict/?marca=Toyota&modelo=Camry&millas=50000&estado_uso=used&ano=2015
- 
+#http://192.168.20.22:5000/predict/?marca=Toyota&modelo=Camry&millas=50000&estado_uso=used&ano=2015
 if __name__ == '__main__':
     app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)

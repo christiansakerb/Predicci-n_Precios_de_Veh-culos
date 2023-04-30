@@ -36,8 +36,10 @@ dataTraining = pd.read_csv('https://raw.githubusercontent.com/davidzarruk/MIAD_M
 dataTesting = pd.read_csv('https://raw.githubusercontent.com/davidzarruk/MIAD_ML_NLP_2023/main/datasets/dataTest_carListings.zip', index_col=0)
 
 Info_Make_models= dataTraining.apply(lambda x: x['Make']+x['Model'], axis=1).drop_duplicates().tolist()
-Frecuencia_Acumulada = dataTraining[['Make','Model']].value_counts(normalize=True).reset_index().sort_values(0,ascending=False)
-Frecuencia_Acumulada['Porcentaje Acum'] = Frecuencia_Acumulada[0].cumsum()
+Frecuencia_Acumulada = dataTraining[['Make', 'Model']].value_counts(normalize=True).reset_index().rename(columns={0: 'Frequency'})
+Frecuencia_Acumulada = Frecuencia_Acumulada.sort_values('Frequency', ascending=False)
+#Frecuencia_Acumulada = dataTraining[['Make','Model']].value_counts(normalize=True).reset_index().sort_values(0,ascending=False)
+Frecuencia_Acumulada['Porcentaje Acum'] = Frecuencia_Acumulada['Frequency'].cumsum()
 Particiones = [0.2,0.4,0.6,0.8,0.9,0.95,0.985,1]
 Particiones_Marcas = {}
 for i in Particiones:
