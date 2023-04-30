@@ -15,7 +15,6 @@ def predic_price(marca,modelo,millas,estado_uso,ano):
 #-----------------------------------------------------------codigo para la api-------------
 import warnings
 warnings.filterwarnings('ignore')
-
 # Importación librerías
 import pandas as pd
 import numpy as np
@@ -35,15 +34,6 @@ import matplotlib.pyplot as plt
 # Carga de datos de archivo .csv
 dataTraining = pd.read_csv('https://raw.githubusercontent.com/davidzarruk/MIAD_ML_NLP_2023/main/datasets/dataTrain_carListings.zip')
 dataTesting = pd.read_csv('https://raw.githubusercontent.com/davidzarruk/MIAD_ML_NLP_2023/main/datasets/dataTest_carListings.zip', index_col=0)
-
-plt.plot(np.cumsum(dataTraining.value_counts('Make',normalize=True)).to_numpy())
-
-Umbral = np.sum(np.cumsum(dataTraining.value_counts('Make',normalize=True)).to_numpy() < 0.8)
-plt.axhline(y=0.9, color='r')
-plt.axvline(x=Umbral)
-print(Umbral)
-plt.title('Pareto de frecuencia de Makeos de vehículos')
-plt.show()
 
 Info_Make_models= dataTraining.apply(lambda x: x['Make']+x['Model'], axis=1).drop_duplicates().tolist()
 Frecuencia_Acumulada = dataTraining[['Make','Model']].value_counts(normalize=True).reset_index().sort_values(0,ascending=False)
@@ -102,7 +92,10 @@ for i in Particiones:
     df_transf[i]=TipoVariable
 df_transf[0.2]['y']
 
-"""#### Entrenamiento de modelos"""
+"""#### Entrenamiento de modelos
+
+##### XGBoost sin calibrar
+"""
 
 #Cálculo de métricas
 def Metricas(yTesteo,y_pred):
@@ -120,8 +113,6 @@ def Metricas(yTesteo,y_pred):
     print("Mean Absolute Percentage Error (MAPE):", mape_metric, "%")
     print(' ')
     return [r2_metric,mse_metric,mae_metric,mape_metric]
-
-"""##### XGBoost sin calibrar"""
 
 #Entrenamiento de modelos
 Xgboost_predictores = {}
@@ -145,101 +136,12 @@ for i in Particiones:
 print('Resultados finales Concatenados:')
 Xgboost_metricas_Total = Metricas(yTest_Completo,yPred_Completo)
 
-#Evuación de particiones
-pd.DataFrame(Xgboost_metricas).T.rename(columns={0:'R2',1:'MSE',2:'MAE',3:'MAPE'})
+"""##### Random Forest
 
-"""##### Random Forest"""
+#### Calibración de modelo
 
-#Entrenamiento de modelos
-rf_predictores = {}
-rf_metricas = {}
-s=0
-yTest_Completo = np.array([])
-yPred_Completo = np.array([])
-for i in Particiones:
-    s+=1
-    XTrain, XTest, yTrain, yTest = train_test_split(df_transf[i]['X'], df_transf[i]['y'], test_size=0.3, random_state=0)
-    rf_predictores[i] = RandomForestRegressor(random_state=0).fit(XTrain,yTrain)
-    print('Modelo de partición ' + str(i) + ' Progreso: ' + str(round(s/len(Particiones)*100,0)) + '%')
-    print('Dim Xtrain: ' + str(XTrain.shape)+ 'Dim Xtrain: ' + str(yTrain.shape)+ 'Dim Xtrain: ' + str(XTest.shape)+ 'Dim Xtrain: ' + str(yTest.shape))
-    
-    yPred = rf_predictores[i].predict(XTest)
-    yTest_Completo = np.concatenate((yTest_Completo,yTest.to_numpy()))
-    yPred_Completo = np.concatenate((yPred_Completo,yPred))
-    print('Resultados: ')
-    rf_metricas[i]=Metricas(yTest,yPred)
-    #Desempeño modelo: 
-print('Resultados finales Concatenados:')
-Random_Forest_metricas_Total= Metricas(yTest_Completo,yPred_Completo)
-
-#Evuación de particiones
-pd.DataFrame(rf_metricas).T.rename(columns={0:'R2',1:'MSE',2:'MAE',3:'MAPE'})
-
-"""#### Calibración de modelo"""
-
-#Calibrando parametros
-
-def Probar_modelo(modelo):
-    Xgboost_calibrado_predictores = {}
-    Xgboost_calibrado_metricas = {}
-    s=0
-    yTest_Completo = np.array([])
-    yPred_Completo = np.array([])
-    for i in Particiones:
-        s+=1
-        XTrain, XTest, yTrain, yTest = train_test_split(df_transf[i]['X'], df_transf[i]['y'], test_size=0.3, random_state=0)
-        Xgboost_calibrado_predictores[i] = modelo.fit(XTrain,yTrain)
-        yPred = Xgboost_calibrado_predictores[i].predict(XTest)
-        yTest_Completo = np.concatenate((yTest_Completo,yTest.to_numpy()))
-        yPred_Completo = np.concatenate((yPred_Completo,yPred)) 
-    return round(r2_score(yTest_Completo, yPred_Completo),3)
-Probar_modelo(XGBRegressor(random_state=0))
-
-#Calibración de Learning Rate:
-learningRate_C = np.linspace(0.2, 0.4, num=5)
-r2_learningRate_C = []
-
-for k in learningRate_C:
-    r2_learningRate_C.append(Probar_modelo(XGBRegressor(random_state=0,learning_rate=k)))
-
-ymax = max(r2_learningRate_C)
-xmax = learningRate_C.tolist()[r2_learningRate_C.index(ymax)]
-
-plt.plot(learningRate_C,r2_learningRate_C)
-plt.text(x=xmax,y=ymax, s=str(round(xmax,3))+' r2:' + str(ymax))
-
-plt.title('Tasa de Aprendizaje')
-plt.show()
-
-#Calibración de N_Estimator:
-n_estimators_C = np.linspace(100, 220, num=4, dtype=int)
-r2_n_estimators_C = []
-for k in n_estimators_C:
-    r2_n_estimators_C.append(Probar_modelo(XGBRegressor(random_state=0,n_estimators=k)))
-
-ymax = max(r2_n_estimators_C)
-xmax = n_estimators_C.tolist()[r2_n_estimators_C.index(ymax)]
-
-plt.plot(n_estimators_C,r2_n_estimators_C)
-plt.text(x=xmax,y=ymax, s=str(xmax)+' r2:' + str(ymax))
-plt.title('Número de estimadores')
-plt.show()
-
-#PRofundidad Máxima de arbol
-max_depth_C = np.linspace(3, 12, num=4, dtype=int)
-r2_max_depth_C = []
-for k in max_depth_C:
-    r2_max_depth_C.append(Probar_modelo(XGBRegressor(random_state=0,max_depth =k)))
-
-ymax = max(r2_max_depth_C)
-xmax = max_depth_C.tolist()[r2_max_depth_C.index(ymax)]
-
-plt.plot(max_depth_C,r2_max_depth_C)
-plt.text(x=xmax,y=ymax, s=str(xmax)+' r2:' + str(ymax))
-plt.title('Profundidad de arboles')
-plt.show()
-
-"""#### Entrenamineto de modelo Calibrado"""
+#### Entrenamineto de modelo Calibrado
+"""
 
 #Entrenamiento de modelos
 Xgboost_calibrado_predictores = {}
@@ -263,29 +165,9 @@ for i in Particiones:
 print('Resultados finales Concatenados:')
 Xgboost_Calibrado_metricas_Total=Metricas(yTest_Completo,yPred_Completo)
 
-pd.DataFrame(Xgboost_calibrado_metricas).T.rename(columns={0:'R2',1:'MSE',2:'MAE',3:'MAPE'})
+"""#### Comparación de modelos
 
-"""#### Comparación de modelos"""
-
-Nombres_Modelos= ['Random_Forest','XGBoost_Sin_Calibrar','XGBoost_Calibrado']
-
-Data_Comparacion = pd.DataFrame([Random_Forest_metricas_Total,Xgboost_metricas_Total,Xgboost_Calibrado_metricas_Total]
-             ,index=Nombres_Modelos,columns=['R2','MSE','MAE','MAPE'])
-Data_Comparacion
-
-np.arange(len(Data_Comparacion.columns)-1)
-
-for k in np.arange(len(Data_Comparacion.columns)-1):
-    print(Data_Comparacion.index.tolist()[k])
-
-for i in Data_Comparacion.columns:
-    plt.bar(x=Data_Comparacion.index,height=Data_Comparacion[i])
-    for k in np.arange(len(Data_Comparacion.columns)-1):
-        plt.text(x=Data_Comparacion.index.tolist()[k],y=Data_Comparacion[i][k],s=Data_Comparacion[i][k])
-    plt.title(i)
-    plt.show()
-
-"""En base a los resultados presentados, podemos hacer las siguientes conclusiones:
+En base a los resultados presentados, podemos hacer las siguientes conclusiones:
 
 R2: El coeficiente de determinación (R2) es un indicador de qué tan bien se ajusta el modelo a los datos. Cuanto más cercano a 1 sea el valor de R2, mejor se ajustará el modelo a los datos. En este caso, los modelos de Random Forest y XGBoost (calibrado y sin calibrar) tienen valores de R2 muy similares, lo que indica que todos los modelos se ajustan bien a los datos.
 
@@ -298,82 +180,9 @@ MAPE: El error porcentual absoluto medio (MAPE) mide el promedio de los errores 
 En general, podemos concluir que el modelo XGBoost calibrado es el mejor modelo para predecir el precio de los vehículos, ya que tiene los valores más bajos de MSE, MAE y MAPE. Sin embargo, los modelos de Random Forest y XGBoost sin calibrar también son modelos sólidos que se ajustan bien a los datos.
 
 ### Validación del modelo para Competencia
+
+#### Función para Predecir
 """
-
-print('Forma del dataTesting: ' + str(dataTesting.shape))
-dataTesting_ID = dataTesting.reset_index()
-dataTesting_ID.head()
-
-Info_Make_models_test = dataTesting.apply(lambda x: x['Make']+x['Model'], axis=1).drop_duplicates().tolist()
-for i in Info_Make_models_test:
-    if i not in Info_Make_models:
-        print('ERROR GRAVE!: ' + i)
-
-# Visualización datos dae test
-df_models_test = {}
-suma=0
-for i in Particiones:
-    df_aux=pd.merge(Particiones_Marcas[i],dataTesting_ID,on=['Make','Model'])
-    df_aux['Make-Mod'] = df_aux.apply(lambda x: x['Make']+x['Model'], axis=1)
-    df_aux=df_aux.drop(columns=['Make','Model'],axis=1)
-    df_models_test[i]=df_aux
-    print('La cantidad de registros de la partición ' + str(i) + ' es ' + str(df_aux.shape))
-    suma += df_aux.shape[0]
-print('Cantidad total de registros: ' +str (suma))
-df_models_test[0.2].head(5)
-
-#Escalado de variables
-Variable_ID = ['ID']
-
-df_scaled_test = {}
-Variable_y = ['Price']
-Variables_numericas=['Year','Mileage']
-Variables_categoricas= ['State','Make-Mod']
-for i in Particiones:
-    df_model_nums = df_models_test[i][Variables_numericas]
-    scaled_data = scalers[i].transform(df_model_nums)
-    scaled_data = pd.DataFrame(scaled_data,columns=['Year','Mileage'])
-    df_scaled_test[i]=pd.concat([df_models_test[i][Variable_ID+Variables_categoricas],scaled_data],axis=1)
-df_scaled_test[0.2].head()
-
-#Codificación One-Hot
-df_dummies_test = {}
-for i in Particiones:
-    df_dummies_test[i]=pd.get_dummies(df_scaled_test[i],columns=Variables_categoricas)
-    print('La partición ' + str(i) + ' tiene la siguiente forma: ' + str(df_dummies_test[i].shape))
-df_dummies_test[0.2]
-
-A_Predecir = {}
-for i in Particiones:
-    Clave = {}
-    Clave['xVal']= df_dummies_test[i].drop('ID',axis=1)
-    Clave['id'] = df_dummies_test[i]['ID']
-    A_Predecir[i]=Clave
-A_Predecir[0.2]['id']
-
-#Revisión de coherencia de columnas
-for i in Particiones:
-    Columnas_Val = A_Predecir[i]['xVal'].columns.tolist()
-    Columnas_Train = df_transf[i]['X'].columns.tolist()
-    for k in Columnas_Train:
-        if k not in Columnas_Val:
-            A_Predecir[i]['xVal'][k]=0
-    A_Predecir[i]['xVal'] = A_Predecir[i]['xVal'].reindex(columns=Columnas_Train)
-    Columnas_Val = A_Predecir[i]['xVal'].columns.tolist()
-    Columnas_Train = df_transf[i]['X'].columns.tolist()
-    print('Las columnas en la partición ' +str(i) +' son las mismas de entrenamiento: '+str(Columnas_Val==Columnas_Train))
-
-#Predicción
-Predicciones={}
-for i in Particiones:
-    yPred= Xgboost_calibrado_predictores[i].predict(A_Predecir[i]['xVal'])
-    yIndex = A_Predecir[i]['id']
-    Predicciones[i]=pd.DataFrame(zip(yIndex,yPred),columns=['ID','Price'])
-Prediccion_Para_Subir = pd.concat(Predicciones.values()).sort_values('ID').set_index('ID')
-Prediccion_Para_Subir.to_csv('test_submission.csv', index_label='ID')
-Prediccion_Para_Subir.head()
-
-"""#### Función para Predecir"""
 
 def Api_para_Predecir(Diccionario_con_datos):
     df_api = pd.DataFrame(Diccionario_con_datos)
