@@ -5,8 +5,15 @@ import pandas as pd
 import joblib
 import sys
 import os
+def predic_price(marca,modelo,millas,estado_uso,ano):
+    ejemplo = {'Year':[ano],
+                   'Mileage':[millas],
+                   'State':[estado_uso],
+                   'Make':[marca],
+                   'Model':[modelo]}      
+    return   Api_para_Predecir(ejemplo)   
 
-def predict_price(Diccionario):
+def Api_para_Predecir(Diccionario):
     Particiones = [0.2,0.4,0.6,0.8,0.9,0.95,0.985,1]
     Particiones_marcas_df = pd.read_excel('Particiones_marcas.xlsx')
     #Transformacion para manejar mismo lenguaje
@@ -99,15 +106,9 @@ def predict_price(Diccionario):
 if __name__ == "__main__":
     
     if len(sys.argv) == 1:
-        print('Please add an Diccionario')
-
-        
+        print('por favor insertar la marca,modelo,millas,estado uso y año')
     else:
-
-        Diccionario = sys.argv[1]
-
-        p1 = predict_price(Diccionario)
-        
-        print(Diccionario)
-        print('Probability of Phishing: ')
-        
+        url = sys.argv[1]
+        p1 = predic_price(url)
+        print(url)
+        print('La probabilidad del precio del carro es: ', p1)
